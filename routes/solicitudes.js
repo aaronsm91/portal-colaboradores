@@ -47,8 +47,8 @@ router.post('/', requireAuth, upload.single('adjunto'), async (req, res) => {
        VALUES ($1, $2, $3, $4, $5, $6, '', 'registrada', $7, $8, $9, $10, $11)`,
       [
         folio, req.user.email, req.user.nombre, tipo, isoFecha, isoFecha,
-        ahora.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }),
-        ahora.toLocaleDateString('es-MX'),
+        ahora.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Mexico_City' }),
+        ahora.toLocaleDateString('es-MX', { timeZone: 'America/Mexico_City' }),
         req.ip,
         req.user.nombre,
         createdAt
@@ -117,8 +117,8 @@ router.post('/:folio/asistencia', requireAuth, requireRole('admin'), async (req,
      SET asistencia_hora = $1, asistencia_fecha = $2, asistencia_ip = $3, asistencia_por = $4, estado = 'registrada'
      WHERE folio = $5 RETURNING folio`,
     [
-      ahora.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }),
-      ahora.toLocaleDateString('es-MX'),
+      ahora.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Mexico_City' }),
+      ahora.toLocaleDateString('es-MX', { timeZone: 'America/Mexico_City' }),
       req.ip,
       req.user.nombre,
       req.params.folio

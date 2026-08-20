@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portal de registro de colaboradores</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@500;600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#1B2A4A;
+    --navy-deep:#101A30;
+    --gold:#B8862E;
+    --gold-light:#F1E4C6;
+    --parchment:#F7F5EE;
+    --paper:#FFFFFF;
+    --ink:#20242E;
+    --ink-soft:#5B6270;
+    --line:#DCD7C8;
+    --sage:#3F6B52;
+    --sage-bg:#E7F0E9;
+    --rust:#9C3B2B;
+    --rust-bg:#F6E5E1;
+    --amber:#8A5A12;
+    --amber-bg:#FBEFDA;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--parchment);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:960px;margin:0 auto;padding:0 20px 60px;}
+  header.letterhead{
+    background:var(--navy);
+    color:#fff;
+    padding:28px 20px 22px;
+    border-bottom:4px solid var(--gold);
+  }
+  header.letterhead .inner{max-width:960px;margin:0 auto;display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;}
+  header.letterhead h1{
+    font-family:'Source Serif 4',serif;
+    font-weight:600;
+    font-size:24px;
+    margin:0 0 4px;
+    letter-spacing:0.2px;
+  }
+  header.letterhead p{margin:0;color:#C9D2E3;font-size:13px;}
+  .session-pill{
+    display:flex;align-items:center;gap:10px;
+    background:rgba(255,255,255,0.08);
+    border:1px solid rgba(255,255,255,0.2);
+    border-radius:6px;
+    padding:8px 12px;
+    font-size:13px;
+  }
+  .session-pill button{
+    background:transparent;border:1px solid rgba(255,255,255,0.4);color:#fff;
+    border-radius:5px;padding:5px 10px;font-size:12px;cursor:pointer;font-family:'Inter',sans-serif;
+  }
+  .session-pill button:hover{background:rgba(255,255,255,0.14);}
+  .card{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:26px 28px;
+    margin-top:28px;
+  }
+  .card h2{
+    font-family:'Source Serif 4',serif;
+    font-weight:600;
+    font-size:19px;
+    margin:0 0 4px;
+    color:var(--navy);
+  }
+  .card .sub{color:var(--ink-soft);font-size:13px;margin:0 0 20px;}
+  label{display:block;font-size:12.5px;color:var(--ink-soft);margin:14px 0 5px;font-weight:500;}
+  label:first-child{margin-top:0;}
+  input,select,textarea{
+    width:100%;
+    padding:9px 10px;
+    border:1px solid var(--line);
+    border-radius:5px;
+    font-size:14px;
+    font-family:'Inter',sans-serif;
+    background:#fff;
+    color:var(--ink);
+  }
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--gold);outline-offset:1px;border-color:var(--gold);}
+  textarea{min-height:70px;resize:vertical;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .btn{
+    margin-top:20px;
+    background:var(--navy);
+    color:#fff;
+    border:none;
+    padding:10px 18px;
+    border-radius:5px;
+    font-size:14px;
+    font-weight:500;
+    cursor:pointer;
+    font-family:'Inter',sans-serif;
+  }
+  .btn:hover{background:var(--navy-deep);}
+  .btn.ghost{background:transparent;color:var(--navy);border:1px solid var(--line);}
+  .btn.ghost:hover{background:var(--parchment);}
+  .btn.small{padding:5px 10px;font-size:12px;margin-top:0;}
+  .link-toggle{margin-top:16px;font-size:13px;color:var(--ink-soft);}
+  .link-toggle button{background:none;border:none;color:var(--navy);text-decoration:underline;cursor:pointer;font-size:13px;padding:0;font-family:'Inter',sans-serif;}
+  .error{color:var(--rust);font-size:12.5px;margin-top:6px;}
+  .hint{color:var(--ink-soft);font-size:12px;margin-top:6px;}
+  .tabs{display:flex;gap:4px;margin-top:26px;border-bottom:1px solid var(--line);}
+  .tab{
+    padding:9px 16px;font-size:13.5px;font-weight:500;color:var(--ink-soft);
+    cursor:pointer;border-bottom:2px solid transparent;
+  }
+  .tab.active{color:var(--navy);border-bottom:2px solid var(--gold);}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px;}
+  th{
+    text-align:left;color:var(--ink-soft);font-weight:500;font-size:11.5px;
+    text-transform:uppercase;letter-spacing:0.4px;
+    border-bottom:1px solid var(--line);padding:9px 8px;
+  }
+  td{padding:10px 8px;border-bottom:1px solid #EFEBDE;vertical-align:top;}
+  tr:last-child td{border-bottom:none;}
+  .folio{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-soft);}
+  .ip{font-family:'IBM Plex Mono',monospace;font-size:12px;}
+  .badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:500;}
+  .badge.pendiente{background:var(--amber-bg);color:var(--amber);}
+  .badge.aprobada{background:var(--sage-bg);color:var(--sage);}
+  .badge.rechazada{background:var(--rust-bg);color:var(--rust);}
+  .badge.registrada{background:var(--sage-bg);color:var(--sage);}
+  .badge.rol{background:var(--gold-light);color:#6B4E17;}
+  .empty{color:var(--ink-soft);font-size:13px;padding:18px 0;text-align:center;}
+  .notice{
+    background:var(--amber-bg);border:1px solid #E9CE9C;color:var(--amber);
+    font-size:12.5px;border-radius:5px;padding:10px 12px;margin-top:22px;
+  }
+  .grid-actions{display:flex;gap:6px;}
+  @media(max-width:640px){.row2{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+
+<header class="letterhead">
+  <div class="inner">
+    <div>
+      <h1>Registro de colaboradores</h1>
+      <p>Portal interno — Recursos Humanos · conforme a la Ley Federal del Trabajo</p>
+    </div>
+    <div id="sessionArea"></div>
+  </div>
+</header>
+
+<div class="wrap" id="app"></div>
+
+<script>
+const API_BASE = '/api';
+
+const state = {
+  view: 'login',
+  user: null,
+  colaboradores: [],
+  solicitudes: [],
+  adminTab: 'colaboradores',
+  pendingReset: null
+};
+
+async function api(path, options = {}){
+  const isForm = options.body instanceof FormData;
+  const res = await fetch(API_BASE + path, {
+    credentials: 'include',
+    headers: isForm ? undefined : { 'Content-Type': 'application/json' },
+    ...options
+  });
+  let data = null;
+  try{ data = await res.json(); }catch(e){}
+  if(!res.ok){
+    throw new Error((data && data.error) || 'Ocurrio un error inesperado.');
+  }
+  return data;
+}
+
+function normalizeSolicitud(s){
+  return {
+    folio: s.folio, email: s.email, nombre: s.nombre, tipo: s.tipo,
+    fechaInicio: s.fecha_inicio, fechaFin: s.fecha_fin, motivo: s.motivo,
+    estado: s.estado,
+    adjunto: s.tiene_adjunto ? { nombre: s.adjunto_nombre } : null,
+    asistencia: s.asistencia_hora ? {
+      hora: s.asistencia_hora, fecha: s.asistencia_fecha,
+      ip: s.asistencia_ip, registradoPor: s.asistencia_por
+    } : null,
+    createdAt: s.created_at
+  };
+}
+
+function normalizeColaborador(c){
+  return { nombre: c.nombre, email: c.email, role: c.role, registeredAt: c.registered_at, ip: c.ip };
+}
+
+async function checkSession(){
+  try{
+    const data = await api('/auth/me');
+    state.user = data.user;
+  }catch(e){
+    state.user = null;
+  }
+}
+
+async function loadDataForRole(){
+  if(!state.user) return;
+  try{
+    const data = await api('/solicitudes');
+    state.solicitudes = data.solicitudes.map(normalizeSolicitud);
+  }catch(e){ state.solicitudes = []; }
+  if(state.user.role !== 'colaborador'){
+    try{
+      const data = await api('/solicitudes/colaboradores');
+      state.colaboradores = data.colaboradores.map(normalizeColaborador);
+    }catch(e){ state.colaboradores = []; }
+  }
+}
+
+function esc(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function render(){
+  renderSession();
+  const app = document.getElementById('app');
+  if(!state.user){
+    if(state.view === 'registro') app.innerHTML = registroView();
+    else if(state.view === 'recuperar') app.innerHTML = recoverView();
+    else if(state.view === 'recuperar-enviado') app.innerHTML = recoverySentView();
+    else if(state.view === 'restablecer') app.innerHTML = resetView();
+    else app.innerHTML = loginView();
+  } else if(state.user.role === 'colaborador'){
+    app.innerHTML = colaboradorView();
+  } else {
+    app.innerHTML = adminView();
+  }
+  attachHandlers();
+}
+
+function renderSession(){
+  const el = document.getElementById('sessionArea');
+  if(!state.user){ el.innerHTML=''; return; }
+  const roleLabel = state.user.role === 'admin' ? 'RH · administrador' : state.user.role === 'visualizador' ? 'Visualizador' : 'Colaborador';
+  el.innerHTML = `<div class="session-pill">
+    <span>${esc(state.user.nombre)} · ${roleLabel}</span>
+    <button id="logoutBtn">Cerrar sesion</button>
+  </div>`;
+}
+
+function loginView(){
+  return `
+  <div class="card" style="max-width:420px;margin-left:auto;margin-right:auto;">
+    <h2>Iniciar sesion</h2>
+    <p class="sub">Accede con tu correo y contrasena registrados.</p>
+    <label for="loginEmail">Correo</label>
+    <input id="loginEmail" type="email" placeholder="nombre@empresa.com">
+    <label for="loginPass">Contrasena</label>
+    <input id="loginPass" type="password" placeholder="Contrasena">
+    <div id="loginError"></div>
+    <button class="btn" id="loginBtn">Iniciar sesion</button>
+    <p class="link-toggle">No tienes cuenta? <button id="toRegistro">Registrate aqui</button></p>
+    <p class="link-toggle"><button id="toRecuperar">Olvidaste tu contrasena?</button></p>
+  </div>`;
+}
+
+function recoverView(){
+  return `
+  <div class="card" style="max-width:420px;margin-left:auto;margin-right:auto;">
+    <h2>Recuperar contrasena</h2>
+    <p class="sub">Ingresa tu correo registrado. Si existe una cuenta, te enviaremos un enlace para restablecer tu contrasena.</p>
+    <label for="recEmail">Correo</label>
+    <input id="recEmail" type="email" placeholder="nombre@empresa.com">
+    <div id="recError"></div>
+    <button class="btn" id="recBtn">Enviar enlace</button>
+    <p class="link-toggle"><button id="recToLogin">Volver a iniciar sesion</button></p>
+  </div>`;
+}
+
+function recoverySentView(){
+  return `
+  <div class="card" style="max-width:460px;margin-left:auto;margin-right:auto;">
+    <h2>Revisa tu correo</h2>
+    <p class="sub">Si el correo que ingresaste esta registrado, te llegara un enlace para restablecer tu contrasena (valido durante 1 hora). Revisa tambien la carpeta de spam.</p>
+    <p class="link-toggle"><button id="recToLogin2">Volver a iniciar sesion</button></p>
+  </div>`;
+}
+
+function resetView(){
+  return `
+  <div class="card" style="max-width:420px;margin-left:auto;margin-right:auto;">
+    <h2>Restablecer contrasena</h2>
+    <p class="sub">Escribe tu nueva contrasena.</p>
+    <label for="newPass">Nueva contrasena</label>
+    <input id="newPass" type="password" placeholder="Minimo 6 caracteres">
+    <label for="newPass2">Confirmar contrasena</label>
+    <input id="newPass2" type="password" placeholder="Repite la contrasena">
+    <div id="resetError"></div>
+    <button class="btn" id="resetBtn">Guardar nueva contrasena</button>
+  </div>`;
+}
+
+function registroView(){
+  return `
+  <div class="card" style="max-width:460px;margin-left:auto;margin-right:auto;">
+    <h2>Registro de colaborador</h2>
+    <p class="sub">Al registrarte se guarda tu direccion IP para verificar el equipo remoto, conforme a tus politicas internas.</p>
+    <label for="regNombre">Nombre completo</label>
+    <input id="regNombre" placeholder="Nombre y apellidos">
+    <label for="regEmail">Correo</label>
+    <input id="regEmail" type="email" placeholder="nombre@empresa.com">
+    <div class="row2">
+      <div>
+        <label for="regPass">Contrasena</label>
+        <input id="regPass" type="password" placeholder="Minimo 6 caracteres">
+      </div>
+      <div>
+        <label for="regPass2">Confirmar contrasena</label>
+        <input id="regPass2" type="password" placeholder="Repite la contrasena">
+      </div>
+    </div>
+    <label for="regRole">Rol</label>
+    <select id="regRole">
+      <option value="colaborador">Colaborador</option>
+      <option value="admin">RH — administrador</option>
+      <option value="visualizador">Visualizador</option>
+    </select>
+    <div id="regCodigoWrap" style="display:none;">
+      <label for="regCodigo">Codigo de acceso (requerido para RH o Visualizador)</label>
+      <input id="regCodigo" type="text" placeholder="Codigo de acceso">
+    </div>
+    <div id="regError"></div>
+    <button class="btn" id="regBtn">Completar registro</button>
+    <p class="link-toggle">Ya tienes cuenta? <button id="toLogin">Inicia sesion</button></p>
+  </div>`;
+}
+
+function colaboradorView(){
+  const mias = [...state.solicitudes].sort((a,b)=> b.createdAt - a.createdAt);
+  const rows = mias.length ? mias.map(s => `
+    <tr>
+      <td class="folio">${s.folio}</td>
+      <td>${s.tipo}</td>
+      <td>${s.fechaInicio} &rarr; ${s.fechaFin}</td>
+      <td>${esc(s.motivo || '—')}${adjuntoLink(s)}</td>
+      <td><span class="badge ${s.estado}">${estadoLabel(s.estado)}</span></td>
+      <td>${attendanceCell(s, false)}</td>
+    </tr>`).join('') : `<tr><td colspan="6" class="empty">Aun no tienes solicitudes registradas.</td></tr>`;
+
+  return `
+  <div class="card">
+    <h2>Nueva solicitud</h2>
+    <p class="sub">Vacaciones, home office o incapacidad. RH revisa y aprueba cada solicitud.</p>
+    <label for="solTipo">Tipo</label>
+    <select id="solTipo">
+      <option value="Vacaciones">Vacaciones</option>
+      <option value="Home office">Home office</option>
+      <option value="Incapacidad">Incapacidad</option>
+      <option value="Asistencia">Asistencia</option>
+    </select>
+    <div class="row2" id="fechasWrap">
+      <div>
+        <label for="solInicio">Fecha inicio</label>
+        <input id="solInicio" type="date">
+      </div>
+      <div>
+        <label for="solFin">Fecha fin</label>
+        <input id="solFin" type="date">
+      </div>
+    </div>
+    <div id="detalleWrap">
+      <label for="solMotivo">Motivo / comentario (folio IMSS si aplica)</label>
+      <textarea id="solMotivo" placeholder="Detalle breve de la solicitud"></textarea>
+      <label for="solAdjunto">Adjuntar documento (opcional, PDF o imagen, maximo 2 MB)</label>
+      <input id="solAdjunto" type="file" accept=".pdf,image/*">
+    </div>
+    <p class="hint" id="asistenciaNote" style="display:none;">Se registrara automaticamente la fecha, hora e IP de este momento — no se puede editar manualmente.</p>
+    <div id="solError"></div>
+    <button class="btn" id="solBtn">Enviar solicitud</button>
+  </div>
+  <p class="hint" style="margin-top:8px;">El adjunto se guarda de forma segura en el servidor y solo pueden verlo tu, RH o el visualizador.</p>
+
+  <div class="card">
+    <h2>Mis solicitudes</h2>
+    <table>
+      <thead><tr><th>Folio</th><th>Tipo</th><th>Fechas</th><th>Motivo</th><th>Estado</th><th>Asistencia</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+function attendanceCell(s, isAdmin){
+  if(s.asistencia){
+    return `<div class="ip">${s.asistencia.hora}<br>${esc(s.asistencia.ip)}</div>`;
+  }
+  if(isAdmin){
+    return `<button class="btn small ghost" data-attendance="${s.folio}">Registrar asistencia</button>`;
+  }
+  return '<span class="hint">Sin registrar</span>';
+}
+
+function adjuntoLink(s){
+  if(!s.adjunto) return '';
+  return `<br><a href="${API_BASE}/solicitudes/${s.folio}/adjunto" target="_blank" rel="noopener">Ver adjunto (${esc(s.adjunto.nombre)})</a>`;
+}
+
+function toggleRegCodigo(){
+  const roleEl = document.getElementById('regRole');
+  const wrap = document.getElementById('regCodigoWrap');
+  if(!roleEl || !wrap) return;
+  wrap.style.display = roleEl.value === 'colaborador' ? 'none' : '';
+}
+
+function toggleSolFields(){
+  const tipoEl = document.getElementById('solTipo');
+  if(!tipoEl) return;
+  const esAsistencia = tipoEl.value === 'Asistencia';
+  const fechasWrap = document.getElementById('fechasWrap');
+  const detalleWrap = document.getElementById('detalleWrap');
+  const nota = document.getElementById('asistenciaNote');
+  if(fechasWrap) fechasWrap.style.display = esAsistencia ? 'none' : '';
+  if(detalleWrap) detalleWrap.style.display = esAsistencia ? 'none' : '';
+  if(nota) nota.style.display = esAsistencia ? '' : 'none';
+  const solInicio = document.getElementById('solInicio');
+  const solFin = document.getElementById('solFin');
+  if(solInicio) solInicio.disabled = esAsistencia;
+  if(solFin) solFin.disabled = esAsistencia;
+}
+
+function estadoLabel(e){
+  return e === 'aprobada' ? 'Aprobada' : e === 'rechazada' ? 'Rechazada' : e === 'registrada' ? 'Registrada' : 'Pendiente';
+}
+
+function adminView(){
+  const isAdmin = state.user.role === 'admin';
+  const tabs = `
+  <div class="tabs">
+    <div class="tab ${state.adminTab==='colaboradores'?'active':''}" data-tab="colaboradores">Colaboradores registrados</div>
+    <div class="tab ${state.adminTab==='solicitudes'?'active':''}" data-tab="solicitudes">Solicitudes</div>
+  </div>`;
+
+  let content = '';
+  if(state.adminTab === 'colaboradores'){
+    const rows = state.colaboradores.length ? state.colaboradores.map(c => `
+      <tr>
+        <td>${esc(c.nombre)}</td>
+        <td>${esc(c.email)}</td>
+        <td><span class="badge rol">${c.role === 'admin' ? 'RH' : c.role === 'visualizador' ? 'Visualizador' : 'Colaborador'}</span></td>
+        <td>${new Date(c.registeredAt).toLocaleDateString('es-MX')}</td>
+        <td class="ip">${esc(c.ip)}</td>
+      </tr>`).join('') : `<tr><td colspan="5" class="empty">Aun no hay colaboradores registrados.</td></tr>`;
+    content = `<table>
+      <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Fecha registro</th><th>IP de registro</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+  } else {
+    const lista = [...state.solicitudes].sort((a,b)=> b.createdAt - a.createdAt);
+    const rows = lista.length ? lista.map(s => `
+      <tr>
+        <td class="folio">${s.folio}</td>
+        <td>${esc(s.nombre)}</td>
+        <td>${s.tipo}</td>
+        <td>${s.fechaInicio} &rarr; ${s.fechaFin}</td>
+        <td>${esc(s.motivo || '—')}${adjuntoLink(s)}</td>
+        <td><span class="badge ${s.estado}">${estadoLabel(s.estado)}</span></td>
+        <td>${attendanceCell(s, isAdmin)}</td>
+        <td>${isAdmin && s.estado === 'pendiente' ? `
+          <div class="grid-actions">
+            <button class="btn small" data-approve="${s.folio}">Aprobar</button>
+            <button class="btn small ghost" data-reject="${s.folio}">Rechazar</button>
+          </div>` : '—'}</td>
+      </tr>`).join('') : `<tr><td colspan="8" class="empty">Aun no hay solicitudes registradas.</td></tr>`;
+    content = `<table>
+      <thead><tr><th>Folio</th><th>Colaborador</th><th>Tipo</th><th>Fechas</th><th>Motivo</th><th>Estado</th><th>Asistencia</th><th>Accion</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+  }
+
+  const notice = isAdmin ? '' : `<div class="notice">Tu rol es de visualizador: puedes consultar la informacion pero no aprobar ni rechazar solicitudes.</div>`;
+
+  return `
+  <div class="card">
+    <h2>${isAdmin ? 'Panel de RH' : 'Panel de consulta'}</h2>
+    <p class="sub">${isAdmin ? 'Revisa el registro de colaboradores y da seguimiento a sus solicitudes.' : 'Consulta el registro de colaboradores y el estado de sus solicitudes.'}</p>
+    ${tabs}
+    <div style="margin-top:16px;">${content}</div>
+    ${notice}
+  </div>`;
+}
+
+function attachHandlers(){
+  const logoutBtn = document.getElementById('logoutBtn');
+  if(logoutBtn) logoutBtn.onclick = async () => {
+    try{ await api('/auth/logout', { method:'POST' }); }catch(e){}
+    state.user = null; state.solicitudes = []; state.colaboradores = []; state.view = 'login';
+    render();
+  };
+
+  const toRegistro = document.getElementById('toRegistro');
+  if(toRegistro) toRegistro.onclick = () => { state.view='registro'; render(); };
+  const toLogin = document.getElementById('toLogin');
+  if(toLogin) toLogin.onclick = () => { state.view='login'; render(); };
+
+  const toRecuperar = document.getElementById('toRecuperar');
+  if(toRecuperar) toRecuperar.onclick = () => { state.view='recuperar'; render(); };
+  const recToLogin = document.getElementById('recToLogin');
+  if(recToLogin) recToLogin.onclick = () => { state.view='login'; render(); };
+  const recToLogin2 = document.getElementById('recToLogin2');
+  if(recToLogin2) recToLogin2.onclick = () => { state.view='login'; render(); };
+  const recBtn = document.getElementById('recBtn');
+  if(recBtn) recBtn.onclick = handleRecover;
+  const resetBtn = document.getElementById('resetBtn');
+  if(resetBtn) resetBtn.onclick = handleResetPassword;
+
+  const loginBtn = document.getElementById('loginBtn');
+  if(loginBtn) loginBtn.onclick = handleLogin;
+
+  const regBtn = document.getElementById('regBtn');
+  if(regBtn) regBtn.onclick = handleRegistro;
+  const regRoleEl = document.getElementById('regRole');
+  if(regRoleEl){ regRoleEl.onchange = toggleRegCodigo; toggleRegCodigo(); }
+
+  const solBtn = document.getElementById('solBtn');
+  if(solBtn) solBtn.onclick = handleSolicitud;
+  const solTipoEl = document.getElementById('solTipo');
+  if(solTipoEl){ solTipoEl.onchange = toggleSolFields; toggleSolFields(); }
+
+  document.querySelectorAll('.tab').forEach(t => {
+    t.onclick = () => { state.adminTab = t.dataset.tab; render(); };
+  });
+  document.querySelectorAll('[data-approve]').forEach(b => {
+    b.onclick = () => resolverSolicitud(b.dataset.approve, 'aprobada');
+  });
+  document.querySelectorAll('[data-reject]').forEach(b => {
+    b.onclick = () => resolverSolicitud(b.dataset.reject, 'rechazada');
+  });
+  document.querySelectorAll('[data-attendance]').forEach(b => {
+    b.onclick = async () => {
+      b.disabled = true;
+      b.textContent = 'Registrando…';
+      await registrarAsistencia(b.dataset.attendance);
+    };
+  });
+}
+
+async function handleRecover(){
+  const email = document.getElementById('recEmail').value.trim().toLowerCase();
+  const errEl = document.getElementById('recError');
+  if(!email){ errEl.innerHTML = '<p class="error">Ingresa tu correo.</p>'; return; }
+  try{
+    await api('/auth/forgot-password', { method:'POST', body: JSON.stringify({ email }) });
+  }catch(e){
+    errEl.innerHTML = `<p class="error">${esc(e.message)}</p>`;
+    return;
+  }
+  state.view = 'recuperar-enviado';
+  render();
+}
+
+async function handleResetPassword(){
+  const p1 = document.getElementById('newPass').value;
+  const p2 = document.getElementById('newPass2').value;
+  const errEl = document.getElementById('resetError');
+  if(!p1 || !p2){ errEl.innerHTML = '<p class="error">Completa ambos campos.</p>'; return; }
+  if(p1.length < 6){ errEl.innerHTML = '<p class="error">La contrasena debe tener al menos 6 caracteres.</p>'; return; }
+  if(p1 !== p2){ errEl.innerHTML = '<p class="error">Las contrasenas no coinciden.</p>'; return; }
+  if(!state.pendingReset || !state.pendingReset.token){
+    errEl.innerHTML = '<p class="error">Este enlace no es valido. Solicita uno nuevo.</p>';
+    return;
+  }
+  try{
+    await api('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token: state.pendingReset.token, password: p1 })
+    });
+  }catch(e){
+    errEl.innerHTML = `<p class="error">${esc(e.message)}</p>`;
+    return;
+  }
+  state.pendingReset = null;
+  state.view = 'login';
+  history.replaceState({}, '', window.location.pathname);
+  render();
+}
+
+async function handleLogin(){
+  const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+  const pass = document.getElementById('loginPass').value;
+  const errEl = document.getElementById('loginError');
+  if(!email || !pass){ errEl.innerHTML = '<p class="error">Ingresa correo y contrasena.</p>'; return; }
+  try{
+    const data = await api('/auth/login', { method:'POST', body: JSON.stringify({ email, password: pass }) });
+    state.user = data.user;
+  }catch(e){
+    errEl.innerHTML = `<p class="error">${esc(e.message)}</p>`;
+    return;
+  }
+  await loadDataForRole();
+  render();
+}
+
+async function handleRegistro(){
+  const nombre = document.getElementById('regNombre').value.trim();
+  const email = document.getElementById('regEmail').value.trim().toLowerCase();
+  const pass = document.getElementById('regPass').value;
+  const pass2 = document.getElementById('regPass2').value;
+  const role = document.getElementById('regRole').value;
+  const codigo = document.getElementById('regCodigo').value.trim();
+  const errEl = document.getElementById('regError');
+
+  if(!nombre || !email || !pass || !pass2){ errEl.innerHTML = '<p class="error">Completa todos los campos.</p>'; return; }
+  if(pass.length < 6){ errEl.innerHTML = '<p class="error">La contrasena debe tener al menos 6 caracteres.</p>'; return; }
+  if(pass !== pass2){ errEl.innerHTML = '<p class="error">Las contrasenas no coinciden.</p>'; return; }
+
+  errEl.innerHTML = '<p class="hint">Registrando…</p>';
+  try{
+    const data = await api('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ nombre, email, password: pass, role, codigo })
+    });
+    state.user = data.user;
+  }catch(e){
+    errEl.innerHTML = `<p class="error">${esc(e.message)}</p>`;
+    return;
+  }
+  await loadDataForRole();
+  state.view = 'login';
+  render();
+}
+
+async function handleSolicitud(){
+  const tipo = document.getElementById('solTipo').value;
+  const errEl = document.getElementById('solError');
+  const btn = document.getElementById('solBtn');
+
+  const formData = new FormData();
+  formData.append('tipo', tipo);
+
+  if(tipo !== 'Asistencia'){
+    const fechaInicio = document.getElementById('solInicio').value;
+    const fechaFin = document.getElementById('solFin').value;
+    const motivo = document.getElementById('solMotivo').value.trim();
+    const fileInput = document.getElementById('solAdjunto');
+    const file = fileInput && fileInput.files[0];
+
+    if(!fechaInicio || !fechaFin){ errEl.innerHTML = '<p class="error">Selecciona fecha de inicio y fin.</p>'; return; }
+    if(fechaFin < fechaInicio){ errEl.innerHTML = '<p class="error">La fecha fin no puede ser anterior a la fecha inicio.</p>'; return; }
+    if(file && file.size > 2*1024*1024){ errEl.innerHTML = '<p class="error">El archivo adjunto supera 2 MB. Elige uno mas ligero.</p>'; return; }
+
+    formData.append('fechaInicio', fechaInicio);
+    formData.append('fechaFin', fechaFin);
+    formData.append('motivo', motivo);
+    if(file) formData.append('adjunto', file);
+  }
+
+  btn.disabled = true;
+  btn.textContent = tipo === 'Asistencia' ? 'Registrando…' : 'Enviando…';
+  errEl.innerHTML = '';
+
+  try{
+    await api('/solicitudes', { method: 'POST', body: formData });
+  }catch(e){
+    errEl.innerHTML = `<p class="error">${esc(e.message)}</p>`;
+    btn.disabled = false;
+    btn.textContent = 'Enviar solicitud';
+    return;
+  }
+  await loadDataForRole();
+  render();
+}
+
+async function resolverSolicitud(folio, estado){
+  try{
+    await api(`/solicitudes/${folio}/estado`, { method:'PATCH', body: JSON.stringify({ estado }) });
+  }catch(e){
+    alert(e.message);
+    return;
+  }
+  await loadDataForRole();
+  render();
+}
+
+async function registrarAsistencia(folio){
+  if(!state.user || state.user.role !== 'admin') return;
+  try{
+    await api(`/solicitudes/${folio}/asistencia`, { method:'POST' });
+  }catch(e){
+    alert(e.message);
+    return;
+  }
+  await loadDataForRole();
+  render();
+}
+
+(async function init(){
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('token');
+  await checkSession();
+  if(!state.user && token){
+    state.pendingReset = { token };
+    state.view = 'restablecer';
+  } else if(state.user){
+    await loadDataForRole();
+  }
+  render();
+})();
+</script>
+</body>
+</html>

@@ -28,8 +28,8 @@ async function nuevoFolio() {
 
 // POST /api/solicitudes
 router.post('/', requireAuth, upload.single('adjunto'), async (req, res) => {
-  const { tipo, fechaInicio, fechaFin, motivo } = req.body;
-  const tiposValidos = ['Vacaciones', 'Home office', 'Incapacidad', 'Asistencia'];
+  const { tipo, fechaInicio, fechaFin, motivo, movimiento, lat, lng } = req.body;
+  const tiposValidos = ['Vacaciones', 'Incidencia', 'Incapacidad', 'Asistencia'];
   if (!tiposValidos.includes(tipo)) {
     return res.status(400).json({ error: 'Tipo de solicitud invalido.' });
   }
@@ -37,26 +37,55 @@ router.post('/', requireAuth, upload.single('adjunto'), async (req, res) => {
   const folio = await nuevoFolio();
   const createdAt = Date.now();
 
+  // Entrada o salida, con ubicacion. Queda registrada de inmediato, sin
+  // pasar por aprobacion (igual que la asistencia autoregistrada de antes).
   if (tipo === 'Asistencia') {
+    if (!['entrada', 'salida'].includes(movimiento)) {
+      return res.status(400).json({ error: 'Indica si es entrada o salida.' });
+    }
     const ahora = new Date();
     const isoFecha = ahora.toISOString().slice(0, 10);
+    const latNum = lat !== undefined && lat !== '' ? Number(lat) : null;
+    const lngNum = lng !== undefined && lng !== '' ? Number(lng) : null;
     await pool.query(
       `INSERT INTO solicitudes
         (folio, email, nombre, tipo, fecha_inicio, fecha_fin, motivo, estado,
-         asistencia_hora, asistencia_fecha, asistencia_ip, asistencia_por, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, '', 'registrada', $7, $8, $9, $10, $11)`,
+         asistencia_hora, asistencia_fecha, asistencia_ip, asistencia_por,
+         asistencia_movimiento, asistencia_lat, asistencia_lng, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, '', 'registrada', $7, $8, $9, $10, $11, $12, $13, $14)`,
       [
         folio, req.user.email, req.user.nombre, tipo, isoFecha, isoFecha,
         ahora.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Mexico_City' }),
         ahora.toLocaleDateString('es-MX', { timeZone: 'America/Mexico_City' }),
         req.ip,
         req.user.nombre,
+        movimiento,
+        Number.isFinite(latNum) ? latNum : null,
+        Number.isFinite(lngNum) ? lngNum : null,
         createdAt
       ]
     );
     return res.status(201).json({ folio });
   }
 
+  // Incidencia: solo motivo y adjunto opcional, sin rango de fechas.
+  if (tipo === 'Incidencia') {
+    if (!motivo || !motivo.trim()) {
+      return res.status(400).json({ error: 'Describe el motivo de la incidencia.' });
+    }
+    const adjuntoNombre = req.file ? req.file.originalname : null;
+    const adjuntoMime = req.file ? req.file.mimetype : null;
+    const adjuntoData = req.file ? req.file.buffer.toString('base64') : null;
+    await pool.query(
+      `INSERT INTO solicitudes
+        (folio, email, nombre, tipo, motivo, adjunto_nombre, adjunto_mime, adjunto_data, estado, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pendiente', $9)`,
+      [folio, req.user.email, req.user.nombre, tipo, motivo.trim(), adjuntoNombre, adjuntoMime, adjuntoData, createdAt]
+    );
+    return res.status(201).json({ folio });
+  }
+
+  // Vacaciones / Incapacidad: requieren rango de fechas.
   if (!fechaInicio || !fechaFin) {
     return res.status(400).json({ error: 'Selecciona fecha de inicio y fin.' });
   }
@@ -83,7 +112,8 @@ router.post('/', requireAuth, upload.single('adjunto'), async (req, res) => {
 router.get('/', requireAuth, async (req, res) => {
   const cols = `id, folio, email, nombre, tipo, fecha_inicio, fecha_fin, motivo, estado,
                 (adjunto_data IS NOT NULL) AS tiene_adjunto, adjunto_nombre,
-                asistencia_hora, asistencia_fecha, asistencia_ip, asistencia_por, created_at`;
+                asistencia_hora, asistencia_fecha, asistencia_ip, asistencia_por,
+                asistencia_movimiento, asistencia_lat, asistencia_lng, created_at`;
   const result = req.user.role === 'colaborador'
     ? await pool.query(`SELECT ${cols} FROM solicitudes WHERE email = $1 ORDER BY created_at DESC`, [req.user.email])
     : await pool.query(`SELECT ${cols} FROM solicitudes ORDER BY created_at DESC`);

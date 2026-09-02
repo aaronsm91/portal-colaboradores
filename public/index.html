@@ -191,7 +191,9 @@ function normalizeSolicitud(s){
     adjunto: s.tiene_adjunto ? { nombre: s.adjunto_nombre } : null,
     asistencia: s.asistencia_hora ? {
       hora: s.asistencia_hora, fecha: s.asistencia_fecha,
-      ip: s.asistencia_ip, registradoPor: s.asistencia_por
+      ip: s.asistencia_ip, registradoPor: s.asistencia_por,
+      movimiento: s.asistencia_movimiento,
+      lat: s.asistencia_lat, lng: s.asistencia_lng
     } : null,
     createdAt: s.created_at
   };
@@ -348,7 +350,7 @@ function colaboradorView(){
     <tr>
       <td class="folio">${s.folio}</td>
       <td>${s.tipo}</td>
-      <td>${s.fechaInicio} &rarr; ${s.fechaFin}</td>
+      <td>${s.fechaInicio ? `${s.fechaInicio} &rarr; ${s.fechaFin}` : '—'}</td>
       <td>${esc(s.motivo || '—')}${adjuntoLink(s)}</td>
       <td><span class="badge ${s.estado}">${estadoLabel(s.estado)}</span></td>
       <td>${attendanceCell(s, false)}</td>
@@ -356,14 +358,23 @@ function colaboradorView(){
 
   return `
   <div class="card">
+    <h2>Registrar asistencia</h2>
+    <p class="sub">Se guarda la fecha, hora, IP y ubicacion de este momento — no se puede editar manualmente. Tu navegador va a pedirte permiso para compartir tu ubicacion.</p>
+    <div id="asistenciaError"></div>
+    <div class="grid-actions">
+      <button class="btn" id="btnEntrada">Registrar entrada</button>
+      <button class="btn ghost" id="btnSalida">Registrar salida</button>
+    </div>
+  </div>
+
+  <div class="card">
     <h2>Nueva solicitud</h2>
-    <p class="sub">Vacaciones, home office o incapacidad. RH revisa y aprueba cada solicitud.</p>
+    <p class="sub">Vacaciones, incidencia o incapacidad. RH revisa y aprueba cada solicitud.</p>
     <label for="solTipo">Tipo</label>
     <select id="solTipo">
       <option value="Vacaciones">Vacaciones</option>
-      <option value="Home office">Home office</option>
+      <option value="Incidencia">Incidencia</option>
       <option value="Incapacidad">Incapacidad</option>
-      <option value="Asistencia">Asistencia</option>
     </select>
     <div class="row2" id="fechasWrap">
       <div>
@@ -381,7 +392,6 @@ function colaboradorView(){
       <label for="solAdjunto">Adjuntar documento (opcional, PDF o imagen, maximo 2 MB)</label>
       <input id="solAdjunto" type="file" accept=".pdf,image/*">
     </div>
-    <p class="hint" id="asistenciaNote" style="display:none;">Se registrara automaticamente la fecha, hora e IP de este momento — no se puede editar manualmente.</p>
     <div id="solError"></div>
     <button class="btn" id="solBtn">Enviar solicitud</button>
   </div>
@@ -398,7 +408,12 @@ function colaboradorView(){
 
 function attendanceCell(s, isAdmin){
   if(s.asistencia){
-    return `<div class="ip">${s.asistencia.hora}<br>${esc(s.asistencia.ip)}</div>`;
+    const movLabel = s.asistencia.movimiento === 'entrada' ? 'Entrada'
+      : s.asistencia.movimiento === 'salida' ? 'Salida' : '';
+    const mapsLink = (s.asistencia.lat != null && s.asistencia.lng != null)
+      ? `<br><a href="https://www.google.com/maps?q=${s.asistencia.lat},${s.asistencia.lng}" target="_blank" rel="noopener">Ver ubicacion</a>`
+      : '';
+    return `<div class="ip">${movLabel ? `<strong>${movLabel}</strong><br>` : ''}${s.asistencia.hora}<br>${esc(s.asistencia.ip)}${mapsLink}</div>`;
   }
   if(isAdmin){
     return `<button class="btn small ghost" data-attendance="${s.folio}">Registrar asistencia</button>`;
@@ -421,17 +436,13 @@ function toggleRegCodigo(){
 function toggleSolFields(){
   const tipoEl = document.getElementById('solTipo');
   if(!tipoEl) return;
-  const esAsistencia = tipoEl.value === 'Asistencia';
+  const esIncidencia = tipoEl.value === 'Incidencia';
   const fechasWrap = document.getElementById('fechasWrap');
-  const detalleWrap = document.getElementById('detalleWrap');
-  const nota = document.getElementById('asistenciaNote');
-  if(fechasWrap) fechasWrap.style.display = esAsistencia ? 'none' : '';
-  if(detalleWrap) detalleWrap.style.display = esAsistencia ? 'none' : '';
-  if(nota) nota.style.display = esAsistencia ? '' : 'none';
+  if(fechasWrap) fechasWrap.style.display = esIncidencia ? 'none' : '';
   const solInicio = document.getElementById('solInicio');
   const solFin = document.getElementById('solFin');
-  if(solInicio) solInicio.disabled = esAsistencia;
-  if(solFin) solFin.disabled = esAsistencia;
+  if(solInicio) solInicio.disabled = esIncidencia;
+  if(solFin) solFin.disabled = esIncidencia;
 }
 
 function estadoLabel(e){
@@ -467,7 +478,7 @@ function adminView(){
         <td class="folio">${s.folio}</td>
         <td>${esc(s.nombre)}</td>
         <td>${s.tipo}</td>
-        <td>${s.fechaInicio} &rarr; ${s.fechaFin}</td>
+        <td>${s.fechaInicio ? `${s.fechaInicio} &rarr; ${s.fechaFin}` : '—'}</td>
         <td>${esc(s.motivo || '—')}${adjuntoLink(s)}</td>
         <td><span class="badge ${s.estado}">${estadoLabel(s.estado)}</span></td>
         <td>${attendanceCell(s, isAdmin)}</td>
@@ -531,6 +542,11 @@ function attachHandlers(){
   if(solBtn) solBtn.onclick = handleSolicitud;
   const solTipoEl = document.getElementById('solTipo');
   if(solTipoEl){ solTipoEl.onchange = toggleSolFields; toggleSolFields(); }
+
+  const btnEntrada = document.getElementById('btnEntrada');
+  if(btnEntrada) btnEntrada.onclick = () => handleAsistencia('entrada');
+  const btnSalida = document.getElementById('btnSalida');
+  if(btnSalida) btnSalida.onclick = () => handleAsistencia('salida');
 
   document.querySelectorAll('.tab').forEach(t => {
     t.onclick = () => { state.adminTab = t.dataset.tab; render(); };
@@ -640,20 +656,23 @@ async function handleSolicitud(){
   const errEl = document.getElementById('solError');
   const btn = document.getElementById('solBtn');
 
+  const motivo = document.getElementById('solMotivo').value.trim();
+  const fileInput = document.getElementById('solAdjunto');
+  const file = fileInput && fileInput.files[0];
+  if(file && file.size > 2*1024*1024){ errEl.innerHTML = '<p class="error">El archivo adjunto supera 2 MB. Elige uno mas ligero.</p>'; return; }
+
   const formData = new FormData();
   formData.append('tipo', tipo);
 
-  if(tipo !== 'Asistencia'){
+  if(tipo === 'Incidencia'){
+    if(!motivo){ errEl.innerHTML = '<p class="error">Describe el motivo de la incidencia.</p>'; return; }
+    formData.append('motivo', motivo);
+    if(file) formData.append('adjunto', file);
+  } else {
     const fechaInicio = document.getElementById('solInicio').value;
     const fechaFin = document.getElementById('solFin').value;
-    const motivo = document.getElementById('solMotivo').value.trim();
-    const fileInput = document.getElementById('solAdjunto');
-    const file = fileInput && fileInput.files[0];
-
     if(!fechaInicio || !fechaFin){ errEl.innerHTML = '<p class="error">Selecciona fecha de inicio y fin.</p>'; return; }
     if(fechaFin < fechaInicio){ errEl.innerHTML = '<p class="error">La fecha fin no puede ser anterior a la fecha inicio.</p>'; return; }
-    if(file && file.size > 2*1024*1024){ errEl.innerHTML = '<p class="error">El archivo adjunto supera 2 MB. Elige uno mas ligero.</p>'; return; }
-
     formData.append('fechaInicio', fechaInicio);
     formData.append('fechaFin', fechaFin);
     formData.append('motivo', motivo);
@@ -661,7 +680,7 @@ async function handleSolicitud(){
   }
 
   btn.disabled = true;
-  btn.textContent = tipo === 'Asistencia' ? 'Registrando…' : 'Enviando…';
+  btn.textContent = 'Enviando…';
   errEl.innerHTML = '';
 
   try{
@@ -670,6 +689,51 @@ async function handleSolicitud(){
     errEl.innerHTML = `<p class="error">${esc(e.message)}</p>`;
     btn.disabled = false;
     btn.textContent = 'Enviar solicitud';
+    return;
+  }
+  await loadDataForRole();
+  render();
+}
+
+async function handleAsistencia(movimiento){
+  const errEl = document.getElementById('asistenciaError');
+  const btnEntrada = document.getElementById('btnEntrada');
+  const btnSalida = document.getElementById('btnSalida');
+  const btnActivo = movimiento === 'entrada' ? btnEntrada : btnSalida;
+  errEl.innerHTML = '';
+  if(btnEntrada) btnEntrada.disabled = true;
+  if(btnSalida) btnSalida.disabled = true;
+  if(btnActivo) btnActivo.textContent = 'Obteniendo ubicacion…';
+
+  let lat = '', lng = '';
+  try{
+    const pos = await new Promise((resolve, reject) => {
+      if(!navigator.geolocation){ reject(new Error('Tu navegador no permite compartir ubicacion.')); return; }
+      navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 });
+    });
+    lat = pos.coords.latitude;
+    lng = pos.coords.longitude;
+  }catch(e){
+    errEl.innerHTML = '<p class="error">No se pudo obtener tu ubicacion. Revisa que le hayas dado permiso de ubicacion a esta pagina en tu navegador e intenta de nuevo.</p>';
+    if(btnEntrada){ btnEntrada.disabled = false; btnEntrada.textContent = 'Registrar entrada'; }
+    if(btnSalida){ btnSalida.disabled = false; btnSalida.textContent = 'Registrar salida'; }
+    return;
+  }
+
+  if(btnActivo) btnActivo.textContent = 'Registrando…';
+
+  const formData = new FormData();
+  formData.append('tipo', 'Asistencia');
+  formData.append('movimiento', movimiento);
+  formData.append('lat', lat);
+  formData.append('lng', lng);
+
+  try{
+    await api('/solicitudes', { method: 'POST', body: formData });
+  }catch(e){
+    errEl.innerHTML = `<p class="error">${esc(e.message)}</p>`;
+    if(btnEntrada){ btnEntrada.disabled = false; btnEntrada.textContent = 'Registrar entrada'; }
+    if(btnSalida){ btnSalida.disabled = false; btnSalida.textContent = 'Registrar salida'; }
     return;
   }
   await loadDataForRole();

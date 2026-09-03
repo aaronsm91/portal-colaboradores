@@ -7,6 +7,7 @@ const cors = require('cors');
 const { init } = require('./db');
 const authRoutes = require('./routes/auth');
 const solicitudesRoutes = require('./routes/solicitudes');
+const reportesRoutes = require('./routes/reportes');
 
 const requiredEnv = ['JWT_SECRET', 'ACCESS_CODE', 'DATABASE_URL'];
 for (const key of requiredEnv) {
@@ -31,6 +32,7 @@ app.use(cookieParser());
 
 app.use('/api/auth', authRoutes);
 app.use('/api/solicitudes', solicitudesRoutes);
+app.use('/api/reportes', reportesRoutes);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 

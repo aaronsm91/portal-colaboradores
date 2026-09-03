@@ -165,7 +165,10 @@ const state = {
   colaboradores: [],
   solicitudes: [],
   adminTab: 'colaboradores',
-  pendingReset: null
+  pendingReset: null,
+  reportesAsistencia: [],
+  reportesIncidencias: [],
+  reportesMes: null
 };
 
 async function api(path, options = {}){
@@ -224,6 +227,21 @@ async function loadDataForRole(){
       state.colaboradores = data.colaboradores.map(normalizeColaborador);
     }catch(e){ state.colaboradores = []; }
   }
+}
+
+async function loadReportesAsistencia(){
+  try{
+    const data = await api('/reportes/asistencia-hoy');
+    state.reportesAsistencia = data.resumen;
+  }catch(e){ state.reportesAsistencia = []; }
+}
+
+async function loadReportesIncidencias(mes){
+  try{
+    const data = await api('/reportes/incidencias-mensual?mes=' + encodeURIComponent(mes));
+    state.reportesMes = data.mes;
+    state.reportesIncidencias = data.resumen;
+  }catch(e){ state.reportesIncidencias = []; }
 }
 
 function esc(s){
@@ -449,12 +467,66 @@ function estadoLabel(e){
   return e === 'aprobada' ? 'Aprobada' : e === 'rechazada' ? 'Rechazada' : e === 'registrada' ? 'Registrada' : 'Pendiente';
 }
 
+function defaultMes(){
+  const d = new Date();
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  return `${d.getFullYear()}-${mm}`;
+}
+
+function reportesTabContent(){
+  const asistRows = state.reportesAsistencia.length ? state.reportesAsistencia.map(r => {
+    let estadoBadge;
+    if(r.sinRegistro) estadoBadge = '<span class="badge rechazada">Sin registrar</span>';
+    else if(r.tarde) estadoBadge = '<span class="badge pendiente">Tarde</span>';
+    else estadoBadge = '<span class="badge aprobada">A tiempo</span>';
+    const salidaBadge = r.salidaTemprana ? ' <span class="badge pendiente">Salida temprana</span>' : '';
+    return `<tr>
+      <td>${esc(r.nombre)}</td>
+      <td>${r.entrada || '—'}</td>
+      <td>${r.salida || '—'}${salidaBadge}</td>
+      <td>${estadoBadge}</td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="4" class="empty">Aun no hay colaboradores con rol "Colaborador" registrados.</td></tr>`;
+
+  const mesActual = state.reportesMes || defaultMes();
+  const incRows = state.reportesIncidencias.length ? state.reportesIncidencias.map(r => `
+    <tr>
+      <td>${esc(r.nombre)}</td>
+      <td>${r.total}</td>
+    </tr>`).join('') : `<tr><td colspan="2" class="empty">Sin incidencias este mes.</td></tr>`;
+
+  return `
+    <h3 style="font-family:'Source Serif 4',serif;color:var(--navy);margin:0 0 4px;font-size:16px;">Asistencia de hoy</h3>
+    <p class="hint" style="margin:0 0 12px;">Tarde = entrada despues de las 10:00 am. Salida temprana = antes de las 6:00 pm.</p>
+    <button class="btn small ghost" id="refreshAsistencia" style="margin-bottom:10px;">Actualizar</button>
+    <table>
+      <thead><tr><th>Colaborador</th><th>Entrada</th><th>Salida</th><th>Estado</th></tr></thead>
+      <tbody>${asistRows}</tbody>
+    </table>
+
+    <h3 style="font-family:'Source Serif 4',serif;color:var(--navy);margin:26px 0 4px;font-size:16px;">Incidencias por mes</h3>
+    <div class="row2" style="align-items:end;max-width:420px;">
+      <div>
+        <label for="reporteMes">Mes</label>
+        <input id="reporteMes" type="month" value="${mesActual}">
+      </div>
+      <div>
+        <a class="btn ghost small" style="display:inline-block;text-decoration:none;text-align:center;" href="${API_BASE}/reportes/incidencias-mensual.csv?mes=${mesActual}" target="_blank" rel="noopener">Descargar (Excel/CSV)</a>
+      </div>
+    </div>
+    <table style="margin-top:14px;">
+      <thead><tr><th>Colaborador</th><th>Total incidencias</th></tr></thead>
+      <tbody>${incRows}</tbody>
+    </table>`;
+}
+
 function adminView(){
   const isAdmin = state.user.role === 'admin';
   const tabs = `
   <div class="tabs">
     <div class="tab ${state.adminTab==='colaboradores'?'active':''}" data-tab="colaboradores">Colaboradores registrados</div>
     <div class="tab ${state.adminTab==='solicitudes'?'active':''}" data-tab="solicitudes">Solicitudes</div>
+    <div class="tab ${state.adminTab==='reportes'?'active':''}" data-tab="reportes">Reportes</div>
   </div>`;
 
   let content = '';
@@ -471,6 +543,8 @@ function adminView(){
       <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Fecha registro</th><th>IP de registro</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>`;
+  } else if(state.adminTab === 'reportes'){
+    content = reportesTabContent();
   } else {
     const lista = [...state.solicitudes].sort((a,b)=> b.createdAt - a.createdAt);
     const rows = lista.length ? lista.map(s => `
@@ -493,6 +567,7 @@ function adminView(){
       <tbody>${rows}</tbody>
     </table>`;
   }
+
 
   const notice = isAdmin ? '' : `<div class="notice">Tu rol es de visualizador: puedes consultar la informacion pero no aprobar ni rechazar solicitudes.</div>`;
 
@@ -549,8 +624,27 @@ function attachHandlers(){
   if(btnSalida) btnSalida.onclick = () => handleAsistencia('salida');
 
   document.querySelectorAll('.tab').forEach(t => {
-    t.onclick = () => { state.adminTab = t.dataset.tab; render(); };
+    t.onclick = async () => {
+      state.adminTab = t.dataset.tab;
+      if(t.dataset.tab === 'reportes'){
+        if(!state.reportesMes) state.reportesMes = defaultMes();
+        await loadReportesAsistencia();
+        await loadReportesIncidencias(state.reportesMes);
+      }
+      render();
+    };
   });
+  const reporteMesEl = document.getElementById('reporteMes');
+  if(reporteMesEl) reporteMesEl.onchange = async () => {
+    state.reportesMes = reporteMesEl.value;
+    await loadReportesIncidencias(state.reportesMes);
+    render();
+  };
+  const refreshAsistenciaBtn = document.getElementById('refreshAsistencia');
+  if(refreshAsistenciaBtn) refreshAsistenciaBtn.onclick = async () => {
+    await loadReportesAsistencia();
+    render();
+  };
   document.querySelectorAll('[data-approve]').forEach(b => {
     b.onclick = () => resolverSolicitud(b.dataset.approve, 'aprobada');
   });

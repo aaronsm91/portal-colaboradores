@@ -28,6 +28,13 @@ async function nuevoFolio() {
 
 // POST /api/solicitudes
 router.post('/', requireAuth, upload.single('adjunto'), async (req, res) => {
+  // El rol 'supervisor' es de solo lectura (unicamente el reporte de
+  // asistencia de hoy) -- no puede crear solicitudes ni registrar su
+  // propia asistencia desde aqui.
+  if (req.user.role === 'supervisor') {
+    return res.status(403).json({ error: 'Tu acceso es de solo consulta.' });
+  }
+
   const { tipo, fechaInicio, fechaFin, motivo, movimiento, lat, lng } = req.body;
   const tiposValidos = ['Vacaciones', 'Incidencia', 'Incapacidad', 'Asistencia'];
   if (!tiposValidos.includes(tipo)) {
@@ -110,6 +117,11 @@ router.post('/', requireAuth, upload.single('adjunto'), async (req, res) => {
 // GET /api/solicitudes  (colaborador: solo las suyas; admin/visualizador: todas)
 // No incluye adjunto_data (puede pesar), solo si tiene adjunto o no.
 router.get('/', requireAuth, async (req, res) => {
+  // El rol 'supervisor' no ve solicitudes (vacaciones, incidencias, etc.),
+  // solo el reporte de asistencia via /api/reportes.
+  if (req.user.role === 'supervisor') {
+    return res.status(403).json({ error: 'Tu acceso es de solo consulta de asistencia.' });
+  }
   const cols = `id, folio, email, nombre, tipo, fecha_inicio, fecha_fin, motivo, estado,
                 (adjunto_data IS NOT NULL) AS tiene_adjunto, adjunto_nombre,
                 asistencia_hora, asistencia_fecha, asistencia_ip, asistencia_por,

@@ -217,6 +217,10 @@ async function checkSession(){
 
 async function loadDataForRole(){
   if(!state.user) return;
+  if(state.user.role === 'supervisor'){
+    await loadReportesAsistencia();
+    return;
+  }
   try{
     const data = await api('/solicitudes');
     state.solicitudes = data.solicitudes.map(normalizeSolicitud);
@@ -259,6 +263,8 @@ function render(){
     else app.innerHTML = loginView();
   } else if(state.user.role === 'colaborador'){
     app.innerHTML = colaboradorView();
+  } else if(state.user.role === 'supervisor'){
+    app.innerHTML = supervisorView();
   } else {
     app.innerHTML = adminView();
   }
@@ -268,7 +274,10 @@ function render(){
 function renderSession(){
   const el = document.getElementById('sessionArea');
   if(!state.user){ el.innerHTML=''; return; }
-  const roleLabel = state.user.role === 'admin' ? 'RH · administrador' : state.user.role === 'visualizador' ? 'Visualizador' : 'Colaborador';
+  const roleLabel = state.user.role === 'admin' ? 'RH · administrador'
+    : state.user.role === 'visualizador' ? 'Visualizador'
+    : state.user.role === 'supervisor' ? 'Supervisor · solo asistencia'
+    : 'Colaborador';
   el.innerHTML = `<div class="session-pill">
     <span>${esc(state.user.nombre)} · ${roleLabel}</span>
     <button id="logoutBtn">Cerrar sesion</button>
@@ -351,6 +360,7 @@ function registroView(){
       <option value="colaborador">Colaborador</option>
       <option value="admin">RH — administrador</option>
       <option value="visualizador">Visualizador</option>
+      <option value="supervisor">Supervisor — solo asistencia</option>
     </select>
     <div id="regCodigoWrap" style="display:none;">
       <label for="regCodigo">Codigo de acceso (requerido para RH o Visualizador)</label>
@@ -473,13 +483,16 @@ function defaultMes(){
   return `${d.getFullYear()}-${mm}`;
 }
 
-function reportesTabContent(){
+function asistenciaHoyTable(){
   const asistRows = state.reportesAsistencia.length ? state.reportesAsistencia.map(r => {
     let estadoBadge;
     if(r.sinRegistro) estadoBadge = '<span class="badge rechazada">Sin registrar</span>';
     else if(r.tarde) estadoBadge = '<span class="badge pendiente">Tarde</span>';
     else estadoBadge = '<span class="badge aprobada">A tiempo</span>';
-    const salidaBadge = r.salidaTemprana ? ' <span class="badge pendiente">Salida temprana</span>' : '';
+    let salidaBadge = '';
+    if(r.salidaTemprana) salidaBadge = ' <span class="badge pendiente">Salida temprana</span>';
+    else if(r.salidaTardia) salidaBadge = ' <span class="badge rol">Salida tardia</span>';
+    else if(r.sinSalida) salidaBadge = ' <span class="badge rechazada">Sin salida</span>';
     return `<tr>
       <td>${esc(r.nombre)}</td>
       <td>${r.entrada || '—'}</td>
@@ -488,6 +501,26 @@ function reportesTabContent(){
     </tr>`;
   }).join('') : `<tr><td colspan="4" class="empty">Aun no hay colaboradores con rol "Colaborador" registrados.</td></tr>`;
 
+  return `
+    <h3 style="font-family:'Source Serif 4',serif;color:var(--navy);margin:0 0 4px;font-size:16px;">Asistencia de hoy</h3>
+    <p class="hint" style="margin:0 0 12px;">Tarde = entrada despues de las 10:00 am. Salida temprana = antes de las 6:00 pm. Salida tardia = despues de las 6:00 pm.</p>
+    <button class="btn small ghost" id="refreshAsistencia" style="margin-bottom:10px;">Actualizar</button>
+    <table>
+      <thead><tr><th>Colaborador</th><th>Entrada</th><th>Salida</th><th>Estado</th></tr></thead>
+      <tbody>${asistRows}</tbody>
+    </table>`;
+}
+
+function supervisorView(){
+  return `
+  <div class="card">
+    <h2>Panel de asistencia</h2>
+    <p class="sub">Consulta de solo lectura: entradas y salidas de hoy.</p>
+    ${asistenciaHoyTable()}
+  </div>`;
+}
+
+function reportesTabContent(){
   const mesActual = state.reportesMes || defaultMes();
   const incRows = state.reportesIncidencias.length ? state.reportesIncidencias.map(r => `
     <tr>
@@ -496,13 +529,7 @@ function reportesTabContent(){
     </tr>`).join('') : `<tr><td colspan="2" class="empty">Sin incidencias este mes.</td></tr>`;
 
   return `
-    <h3 style="font-family:'Source Serif 4',serif;color:var(--navy);margin:0 0 4px;font-size:16px;">Asistencia de hoy</h3>
-    <p class="hint" style="margin:0 0 12px;">Tarde = entrada despues de las 10:00 am. Salida temprana = antes de las 6:00 pm.</p>
-    <button class="btn small ghost" id="refreshAsistencia" style="margin-bottom:10px;">Actualizar</button>
-    <table>
-      <thead><tr><th>Colaborador</th><th>Entrada</th><th>Salida</th><th>Estado</th></tr></thead>
-      <tbody>${asistRows}</tbody>
-    </table>
+    ${asistenciaHoyTable()}
 
     <h3 style="font-family:'Source Serif 4',serif;color:var(--navy);margin:26px 0 4px;font-size:16px;">Incidencias por mes</h3>
     <div class="row2" style="align-items:end;max-width:420px;">
@@ -535,7 +562,7 @@ function adminView(){
       <tr>
         <td>${esc(c.nombre)}</td>
         <td>${esc(c.email)}</td>
-        <td><span class="badge rol">${c.role === 'admin' ? 'RH' : c.role === 'visualizador' ? 'Visualizador' : 'Colaborador'}</span></td>
+        <td><span class="badge rol">${c.role === 'admin' ? 'RH' : c.role === 'visualizador' ? 'Visualizador' : c.role === 'supervisor' ? 'Supervisor' : 'Colaborador'}</span></td>
         <td>${new Date(c.registeredAt).toLocaleDateString('es-MX')}</td>
         <td class="ip">${esc(c.ip)}</td>
       </tr>`).join('') : `<tr><td colspan="5" class="empty">Aun no hay colaboradores registrados.</td></tr>`;

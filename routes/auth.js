@@ -53,7 +53,7 @@ router.post('/register', authLimiter, async (req, res) => {
   if (password.length < 6) {
     return res.status(400).json({ error: 'La contrasena debe tener al menos 6 caracteres.' });
   }
-  const rolFinal = ['colaborador', 'admin', 'visualizador'].includes(role) ? role : 'colaborador';
+  const rolFinal = ['colaborador', 'admin', 'visualizador', 'supervisor'].includes(role) ? role : 'colaborador';
   if (rolFinal !== 'colaborador' && codigo !== process.env.ACCESS_CODE) {
     return res.status(403).json({ error: 'Codigo de acceso incorrecto para ese rol.' });
   }

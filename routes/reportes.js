@@ -60,7 +60,9 @@ async function getResumenAsistenciaHoy() {
       salida: datos.salida,
       tarde: !!(datos.entrada && datos.entrada > HORA_ENTRADA_LIMITE),
       salidaTemprana: !!(datos.salida && datos.salida < HORA_SALIDA_LIMITE),
-      sinRegistro: !datos.entrada
+      salidaTardia: !!(datos.salida && datos.salida > HORA_SALIDA_LIMITE),
+      sinRegistro: !datos.entrada,
+      sinSalida: !!(datos.entrada && !datos.salida)
     };
   });
 }
@@ -103,7 +105,9 @@ function csvEscape(s) {
 // ===================== Endpoints para ver en el portal =====================
 
 // GET /api/reportes/asistencia-hoy
-router.get('/asistencia-hoy', requireAuth, requireRole('admin', 'visualizador'), async (req, res) => {
+// El rol 'supervisor' SOLO tiene acceso a este endpoint de todo /api/reportes
+// y de todo /api/solicitudes -- es su unica ventana al sistema.
+router.get('/asistencia-hoy', requireAuth, requireRole('admin', 'visualizador', 'supervisor'), async (req, res) => {
   const resumen = await getResumenAsistenciaHoy();
   res.json({ resumen });
 });
@@ -138,25 +142,45 @@ function autorizadoParaCron(req) {
   return !!process.env.CRON_SECRET && req.query.secret === process.env.CRON_SECRET;
 }
 
-// GET /api/reportes/cron/reporte-diario?secret=...
-router.get('/cron/reporte-diario', async (req, res) => {
+// GET /api/reportes/cron/aviso-tardanzas?secret=...
+// Pensado para correr todos los dias a las 10:30 am (hora Mexico).
+// Reporta quien ya registro su entrada tarde (despues de las 10:00 am).
+router.get('/cron/aviso-tardanzas', async (req, res) => {
   if (!autorizadoParaCron(req)) return res.status(403).json({ error: 'No autorizado.' });
 
   const resumen = await getResumenAsistenciaHoy();
   const tarde = resumen.filter(r => r.tarde);
-  const salidaTemprana = resumen.filter(r => r.salidaTemprana);
-  const sinRegistro = resumen.filter(r => r.sinRegistro);
 
-  let texto = `*Resumen de asistencia — ${hoyISO()}*`;
+  let texto = `*Aviso 10:30 am — entradas tarde de hoy (${hoyISO()})*`;
   texto += tarde.length
     ? `\n\n:warning: *Llegaron despues de las 10:00 am:*\n` + tarde.map(r => `• ${r.nombre} — ${r.entrada}`).join('\n')
-    : `\n\n:white_check_mark: Nadie llego tarde hoy.`;
-  if (salidaTemprana.length) {
-    texto += `\n\n:warning: *Salieron antes de las 6:00 pm:*\n` + salidaTemprana.map(r => `• ${r.nombre} — ${r.salida}`).join('\n');
-  }
-  if (sinRegistro.length) {
-    texto += `\n\n:grey_question: *Sin registro de entrada hoy:*\n` + sinRegistro.map(r => `• ${r.nombre}`).join('\n');
-  }
+    : `\n\n:white_check_mark: Nadie ha llegado tarde hasta ahora.`;
+
+  await sendSlackMessage(texto);
+  res.json({ ok: true });
+});
+
+// GET /api/reportes/cron/aviso-salidas?secret=...
+// Pensado para correr todos los dias a las 6:30 pm (hora Mexico).
+// Reporta salida temprana, salida tardia, y quien no marco salida.
+router.get('/cron/aviso-salidas', async (req, res) => {
+  if (!autorizadoParaCron(req)) return res.status(403).json({ error: 'No autorizado.' });
+
+  const resumen = await getResumenAsistenciaHoy();
+  const salidaTemprana = resumen.filter(r => r.salidaTemprana);
+  const salidaTardia = resumen.filter(r => r.salidaTardia);
+  const sinSalida = resumen.filter(r => r.sinSalida);
+
+  let texto = `*Aviso 6:30 pm — salidas de hoy (${hoyISO()})*`;
+  texto += salidaTemprana.length
+    ? `\n\n:warning: *Salieron antes de las 6:00 pm:*\n` + salidaTemprana.map(r => `• ${r.nombre} — ${r.salida}`).join('\n')
+    : `\n\n:white_check_mark: Nadie salio antes de las 6:00 pm.`;
+  texto += salidaTardia.length
+    ? `\n\n:clock4: *Salieron despues de las 6:00 pm:*\n` + salidaTardia.map(r => `• ${r.nombre} — ${r.salida}`).join('\n')
+    : '';
+  texto += sinSalida.length
+    ? `\n\n:grey_question: *No han marcado salida:*\n` + sinSalida.map(r => `• ${r.nombre} — entrada ${r.entrada}`).join('\n')
+    : '';
 
   await sendSlackMessage(texto);
   res.json({ ok: true });

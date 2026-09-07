@@ -21,7 +21,7 @@ async function init() {
       nombre TEXT NOT NULL,
       email TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
-      role TEXT NOT NULL CHECK(role IN ('colaborador','admin','visualizador')),
+      role TEXT NOT NULL CHECK(role IN ('colaborador','admin','visualizador','supervisor')),
       ip TEXT,
       registered_at BIGINT NOT NULL
     );
@@ -85,6 +85,16 @@ async function init() {
   await pool.query(`
     ALTER TABLE solicitudes ADD CONSTRAINT solicitudes_asistencia_movimiento_check
     CHECK (asistencia_movimiento IS NULL OR asistencia_movimiento IN ('entrada','salida')) NOT VALID;
+  `);
+
+  // Agrega el rol 'supervisor' (acceso de solo lectura, unicamente al
+  // reporte de asistencia de hoy -- sin ver colaboradores, solicitudes
+  // ni incidencias). Como solo se agrega una opcion nueva, los datos
+  // existentes ya cumplen la restriccion sin necesidad de "NOT VALID".
+  await pool.query(`ALTER TABLE colaboradores DROP CONSTRAINT IF EXISTS colaboradores_role_check;`);
+  await pool.query(`
+    ALTER TABLE colaboradores ADD CONSTRAINT colaboradores_role_check
+    CHECK (role IN ('colaborador','admin','visualizador','supervisor'));
   `);
 }
 

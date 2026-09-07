@@ -511,10 +511,10 @@ function asistenciaHoyTable(){
   const fechaActual = state.reportesAsistenciaFecha || defaultFecha();
   const asistRows = state.reportesAsistencia.length ? state.reportesAsistencia.map(r => {
     let estadoBadge;
-    if(r.homeOffice && r.sinRegistro) estadoBadge = '<span class="badge rol">Home office</span>';
-    else if(r.sinRegistro) estadoBadge = '<span class="badge rechazada">Sin registrar</span>';
+    if(r.sinRegistro) estadoBadge = '<span class="badge rechazada">Sin registrar</span>';
     else if(r.tarde) estadoBadge = '<span class="badge pendiente">Tarde</span>';
     else estadoBadge = '<span class="badge aprobada">A tiempo</span>';
+    const formatoBadge = r.homeOffice ? '<span class="badge rol">Home office</span>' : 'Oficina';
     let salidaBadge = '';
     if(r.salidaTemprana) salidaBadge = ' <span class="badge pendiente">Salida temprana</span>';
     else if(r.salidaTardia) salidaBadge = ' <span class="badge rol">Salida tardia</span>';
@@ -527,13 +527,14 @@ function asistenciaHoyTable(){
       <td>${esc(r.nombre)}</td>
       <td>${r.entrada || '—'}${entradaMapa}</td>
       <td>${r.salida || '—'}${salidaMapa}${salidaBadge}</td>
+      <td>${formatoBadge}</td>
       <td>${estadoBadge}</td>
     </tr>`;
-  }).join('') : `<tr><td colspan="4" class="empty">Sin colaboradores o sin registros para ese dia.</td></tr>`;
+  }).join('') : `<tr><td colspan="5" class="empty">Sin colaboradores o sin registros para ese dia.</td></tr>`;
 
   return `
     <h3 style="font-family:'Source Serif 4',serif;color:var(--navy);margin:0 0 4px;font-size:16px;">Asistencia</h3>
-    <p class="hint" style="margin:0 0 12px;">Tarde = entrada despues de las 10:00 am. Salida temprana = antes de las 6:00 pm. Salida tardia = despues de las 6:00 pm. "Home office" = no se espera registro ese dia. El icono 📍 abre la ubicacion en Google Maps.</p>
+    <p class="hint" style="margin:0 0 12px;">Tarde = entrada despues de las 10:00 am. Salida temprana = antes de las 6:00 pm. Salida tardia = despues de las 6:00 pm. "Formato" indica si ese dia le tocaba oficina o home office (segun su horario). El icono 📍 abre la ubicacion en Google Maps.</p>
     <div class="row2" style="align-items:end;max-width:340px;margin-bottom:10px;">
       <div>
         <label for="asistenciaFecha">Fecha</label>
@@ -544,7 +545,7 @@ function asistenciaHoyTable(){
       </div>
     </div>
     <table>
-      <thead><tr><th>Colaborador</th><th>Entrada</th><th>Salida</th><th>Estado</th></tr></thead>
+      <thead><tr><th>Colaborador</th><th>Entrada</th><th>Salida</th><th>Formato</th><th>Estado</th></tr></thead>
       <tbody>${asistRows}</tbody>
     </table>`;
 }

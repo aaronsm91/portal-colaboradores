@@ -2,6 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const { pool } = require('../db');
 const { requireAuth, requireRole } = require('../middleware/auth');
+const { nombresCoinciden } = require('../lib/nombres');
 
 const router = express.Router();
 
@@ -135,9 +136,42 @@ router.get('/', requireAuth, async (req, res) => {
 // GET /api/solicitudes/colaboradores  (admin/visualizador)
 router.get('/colaboradores', requireAuth, requireRole('admin', 'visualizador'), async (req, res) => {
   const result = await pool.query(
-    'SELECT id, nombre, email, role, ip, registered_at FROM colaboradores ORDER BY registered_at DESC'
+    'SELECT id, nombre, email, role, ip, registered_at, home_office_dias FROM colaboradores ORDER BY registered_at DESC'
   );
   res.json({ colaboradores: result.rows });
+});
+
+// PATCH /api/solicitudes/colaboradores/:email/home-office  (solo admin)
+// Body: { dias: [1,3] }  -- 1=lunes ... 5=viernes
+router.patch('/colaboradores/:email/home-office', requireAuth, requireRole('admin'), async (req, res) => {
+  const dias = Array.isArray(req.body.dias) ? req.body.dias : [];
+  const validos = dias.every(d => Number.isInteger(d) && d >= 1 && d <= 5);
+  if (!validos) {
+    return res.status(400).json({ error: 'Dias invalidos.' });
+  }
+  const diasUnicos = [...new Set(dias)];
+  const result = await pool.query(
+    'UPDATE colaboradores SET home_office_dias = $1 WHERE email = $2 RETURNING email',
+    [diasUnicos, req.params.email]
+  );
+  if (!result.rows.length) return res.status(404).json({ error: 'Colaborador no encontrado.' });
+  res.json({ ok: true });
+});
+
+// GET /api/solicitudes/roster-faltantes  (admin/visualizador)
+// Compara la lista maestra (roster_esperado) contra quien ya esta
+// registrado como colaborador, y devuelve quienes de esa lista todavia
+// no tienen cuenta. Se calcula en vivo en cada llamada, para que nunca
+// quede desactualizado conforme la gente se va registrando.
+router.get('/roster-faltantes', requireAuth, requireRole('admin', 'visualizador'), async (req, res) => {
+  const roster = await pool.query(
+    'SELECT nombre_completo, departamento FROM roster_esperado ORDER BY departamento, nombre_completo'
+  );
+  const colaboradores = await pool.query(`SELECT nombre FROM colaboradores WHERE role = 'colaborador'`);
+  const faltantes = roster.rows.filter(r =>
+    !colaboradores.rows.some(c => nombresCoinciden(r.nombre_completo, c.nombre))
+  );
+  res.json({ faltantes, totalRoster: roster.rows.length });
 });
 
 // PATCH /api/solicitudes/:folio/estado  (solo admin)

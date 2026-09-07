@@ -24,6 +24,14 @@ function horaMexico24(epochMs) {
   });
 }
 
+// Dia de la semana ISO (1=lunes ... 7=domingo) de una fecha 'YYYY-MM-DD',
+// sin ambiguedad de zona horaria (se trata como fecha de calendario pura).
+function diaSemanaISO(fechaISO) {
+  const [y, m, d] = fechaISO.split('-').map(Number);
+  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay(); // 0=domingo...6=sabado
+  return dow === 0 ? 7 : dow;
+}
+
 // --- Asistencia de un dia dado (por default hoy): quien llego tarde,
 // quien salio temprano/tardio, quien no marco, y su ubicacion ---
 async function getResumenAsistenciaHoy(fechaParam) {
@@ -59,11 +67,13 @@ async function getResumenAsistenciaHoy(fechaParam) {
   }
 
   const colaboradores = await pool.query(
-    `SELECT nombre, email FROM colaboradores WHERE role = 'colaborador' ORDER BY nombre`
+    `SELECT nombre, email, home_office_dias FROM colaboradores WHERE role = 'colaborador' ORDER BY nombre`
   );
+  const diaSemana = diaSemanaISO(dia);
 
   return colaboradores.rows.map(c => {
     const datos = porEmail[c.email] || { entrada: null, salida: null, entradaLat: null, entradaLng: null, salidaLat: null, salidaLng: null };
+    const homeOffice = Array.isArray(c.home_office_dias) && c.home_office_dias.includes(diaSemana);
     return {
       nombre: c.nombre,
       email: c.email,
@@ -73,6 +83,7 @@ async function getResumenAsistenciaHoy(fechaParam) {
       entradaLng: datos.entradaLng,
       salidaLat: datos.salidaLat,
       salidaLng: datos.salidaLng,
+      homeOffice,
       tarde: !!(datos.entrada && datos.entrada > HORA_ENTRADA_LIMITE),
       salidaTemprana: !!(datos.salida && datos.salida < HORA_SALIDA_LIMITE),
       salidaTardia: !!(datos.salida && datos.salida > HORA_SALIDA_LIMITE),

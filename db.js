@@ -96,6 +96,74 @@ async function init() {
     ALTER TABLE colaboradores ADD CONSTRAINT colaboradores_role_check
     CHECK (role IN ('colaborador','admin','visualizador','supervisor'));
   `);
+
+  // Dias de la semana (1=lunes ... 5=viernes) en los que un colaborador
+  // trabaja desde casa segun el esquema hibrido. Vacio = siempre presencial.
+  await pool.query(`ALTER TABLE colaboradores ADD COLUMN IF NOT EXISTS home_office_dias INTEGER[] NOT NULL DEFAULT '{}';`);
+
+  // --- Roster maestro (la lista de quienes DEBEN usar la plataforma) ---
+  // Es independiente de quien ya se registro -- sirve para comparar y
+  // avisar en el panel de RH quienes de esta lista aun no tienen cuenta.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS roster_esperado (
+      id SERIAL PRIMARY KEY,
+      nombre_completo TEXT NOT NULL,
+      departamento TEXT,
+      home_office_dias INTEGER[] NOT NULL DEFAULT '{}',
+      created_at BIGINT NOT NULL
+    );
+  `);
+
+  // Semilla inicial del roster -- solo se inserta la primera vez (si la
+  // tabla ya tiene datos, no se toca; asi RH puede editarla libremente
+  // despues sin que se reinserte o se resetee en cada reinicio).
+  const rosterCount = await pool.query('SELECT COUNT(*)::int AS n FROM roster_esperado');
+  if (rosterCount.rows[0].n === 0) {
+    const ahora = Date.now();
+    const rosterInicial = [
+      ['Sandoval Medina Rodrigo Aaron', 'Ventas', [4]],
+      ['Arce Gonzalez Gerardo Jacobo', 'Ventas', [2, 3]],
+      ['Martinez Beltran Juan Alberto', 'Ventas', [4]],
+      ['Godinez Rodriguez Jonnathan Habib', 'Ventas', [2, 4]],
+      ['Garcia Garfias Carlos Eduardo', 'Ventas', [1, 2]],
+      ['Garcia Ferreira Guillermo', 'Ventas', [1, 4]],
+      ['Ruiz Miguel Patricio', 'Ventas', [1, 4]],
+      ['Gordillo Mata Katia Viridiana', 'Ventas', [2, 3]],
+      ['Sandoval Medina Jesus Eduardo', 'Finanzas', [5]],
+      ['Lopez Lopez Karla Andrea', 'Finanzas', [2, 4]],
+      ['Suarez Arevalo Manuel Enrique', 'Finanzas', [1, 2, 3, 5]],
+      ['Perez Ramirez Isaias Emanuel', 'Finanzas', [5]],
+      ['Vera Hernandez Tabatha', 'Finanzas', [1, 3, 4]],
+      ['Arreola Navarro Oscar', 'Finanzas', [4, 5]],
+      ['Rojas Lindero Mariana', 'Finanzas', [1, 5]],
+      ['Rincon Nunez Francisco Roman', 'Finanzas', [5]],
+      ['Gomez Perez Edgar Uriel', 'Finanzas', [2, 4, 5]],
+      ['Garduno Ortega Sebastian', 'Direccion', [5]],
+      ['Ramirez Galindo Diego Josue', 'Direccion', [5]]
+    ];
+    for (const [nombre, depto, dias] of rosterInicial) {
+      await pool.query(
+        'INSERT INTO roster_esperado (nombre_completo, departamento, home_office_dias, created_at) VALUES ($1,$2,$3,$4)',
+        [nombre, depto, dias, ahora]
+      );
+    }
+  }
+
+  // Intenta aplicar automaticamente los dias de home office del roster a
+  // colaboradores ya registrados, cuando el nombre coincide con confianza
+  // Y el colaborador aun no tiene dias configurados -- para no pisar un
+  // ajuste manual que RH haya hecho despues desde el panel.
+  const { nombresCoinciden } = require('./lib/nombres');
+  const roster = await pool.query('SELECT nombre_completo, home_office_dias FROM roster_esperado');
+  const colabsSinConfigurar = await pool.query(
+    `SELECT email, nombre FROM colaboradores WHERE role = 'colaborador' AND home_office_dias = '{}'`
+  );
+  for (const colab of colabsSinConfigurar.rows) {
+    const match = roster.rows.find(r => nombresCoinciden(r.nombre_completo, colab.nombre));
+    if (match && match.home_office_dias.length) {
+      await pool.query('UPDATE colaboradores SET home_office_dias = $1 WHERE email = $2', [match.home_office_dias, colab.email]);
+    }
+  }
 }
 
 module.exports = { pool, init };

@@ -138,6 +138,22 @@
     background:var(--amber-bg);border:1px solid #E9CE9C;color:var(--amber);
     font-size:12.5px;border-radius:5px;padding:10px 12px;margin-top:22px;
   }
+  .alerta-faltantes{
+    background:var(--rust-bg);border:2px solid var(--rust);color:var(--rust);
+    border-radius:8px;padding:14px 16px;margin-bottom:18px;
+  }
+  .alerta-faltantes .titulo{font-size:16px;font-weight:700;margin:0 0 8px;}
+  .alerta-faltantes ul{margin:0;padding-left:20px;line-height:1.7;font-size:13px;}
+  .alerta-ok{
+    background:var(--sage-bg);border:1px solid var(--sage);color:var(--sage);
+    border-radius:8px;padding:10px 14px;margin-bottom:18px;font-size:13px;font-weight:600;
+  }
+  .dias-toggle{display:flex;gap:4px;}
+  .dia-btn{
+    width:26px;height:26px;border-radius:5px;border:1px solid var(--line);
+    background:#fff;color:var(--ink-soft);font-size:11px;font-weight:700;cursor:pointer;
+  }
+  .dia-btn.activo{background:var(--gold);border-color:var(--gold);color:#fff;}
   .grid-actions{display:flex;gap:6px;}
   @media(max-width:640px){.row2{grid-template-columns:1fr;}}
 </style>
@@ -170,7 +186,8 @@ const state = {
   reportesIncidencias: [],
   reportesMes: null,
   reportesAsistenciaFecha: null,
-  regRolForzado: null
+  regRolForzado: null,
+  rosterFaltantes: []
 };
 
 async function api(path, options = {}){
@@ -205,7 +222,7 @@ function normalizeSolicitud(s){
 }
 
 function normalizeColaborador(c){
-  return { nombre: c.nombre, email: c.email, role: c.role, registeredAt: c.registered_at, ip: c.ip };
+  return { nombre: c.nombre, email: c.email, role: c.role, registeredAt: c.registered_at, ip: c.ip, homeOfficeDias: c.home_office_dias || [] };
 }
 
 async function checkSession(){
@@ -232,7 +249,15 @@ async function loadDataForRole(){
       const data = await api('/solicitudes/colaboradores');
       state.colaboradores = data.colaboradores.map(normalizeColaborador);
     }catch(e){ state.colaboradores = []; }
+    await loadRosterFaltantes();
   }
+}
+
+async function loadRosterFaltantes(){
+  try{
+    const data = await api('/solicitudes/roster-faltantes');
+    state.rosterFaltantes = data.faltantes;
+  }catch(e){ state.rosterFaltantes = []; }
 }
 
 async function loadReportesAsistencia(fecha){
@@ -486,7 +511,8 @@ function asistenciaHoyTable(){
   const fechaActual = state.reportesAsistenciaFecha || defaultFecha();
   const asistRows = state.reportesAsistencia.length ? state.reportesAsistencia.map(r => {
     let estadoBadge;
-    if(r.sinRegistro) estadoBadge = '<span class="badge rechazada">Sin registrar</span>';
+    if(r.homeOffice && r.sinRegistro) estadoBadge = '<span class="badge rol">Home office</span>';
+    else if(r.sinRegistro) estadoBadge = '<span class="badge rechazada">Sin registrar</span>';
     else if(r.tarde) estadoBadge = '<span class="badge pendiente">Tarde</span>';
     else estadoBadge = '<span class="badge aprobada">A tiempo</span>';
     let salidaBadge = '';
@@ -507,7 +533,7 @@ function asistenciaHoyTable(){
 
   return `
     <h3 style="font-family:'Source Serif 4',serif;color:var(--navy);margin:0 0 4px;font-size:16px;">Asistencia</h3>
-    <p class="hint" style="margin:0 0 12px;">Tarde = entrada despues de las 10:00 am. Salida temprana = antes de las 6:00 pm. Salida tardia = despues de las 6:00 pm. El icono 📍 abre la ubicacion en Google Maps.</p>
+    <p class="hint" style="margin:0 0 12px;">Tarde = entrada despues de las 10:00 am. Salida temprana = antes de las 6:00 pm. Salida tardia = despues de las 6:00 pm. "Home office" = no se espera registro ese dia. El icono 📍 abre la ubicacion en Google Maps.</p>
     <div class="row2" style="align-items:end;max-width:340px;margin-bottom:10px;">
       <div>
         <label for="asistenciaFecha">Fecha</label>
@@ -559,6 +585,31 @@ function reportesTabContent(){
     </table>`;
 }
 
+function rosterFaltantesBanner(){
+  if(!state.rosterFaltantes.length){
+    return `<div class="alerta-ok">✅ Todos los de la lista maestra ya estan registrados en el portal.</div>`;
+  }
+  const items = state.rosterFaltantes.map(f => `<li><strong>${esc(f.nombre_completo)}</strong>${f.departamento ? ` — ${esc(f.departamento)}` : ''}</li>`).join('');
+  return `
+  <div class="alerta-faltantes">
+    <p class="titulo">⚠️ Faltan ${state.rosterFaltantes.length} persona${state.rosterFaltantes.length === 1 ? '' : 's'} por registrarse</p>
+    <ul>${items}</ul>
+  </div>`;
+}
+
+function diasHomeOfficeCell(c, isAdmin){
+  if(c.role !== 'colaborador') return '<span class="hint">—</span>';
+  const dias = [[1,'L'],[2,'M'],[3,'X'],[4,'J'],[5,'V']];
+  const activos = c.homeOfficeDias || [];
+  if(!isAdmin){
+    const etiquetas = dias.filter(([num]) => activos.includes(num)).map(([,letra]) => letra);
+    return etiquetas.length ? etiquetas.join(', ') : '<span class="hint">Presencial</span>';
+  }
+  return `<div class="dias-toggle" data-email="${esc(c.email)}">` + dias.map(([num, letra]) =>
+    `<button type="button" class="dia-btn ${activos.includes(num) ? 'activo' : ''}" data-dia="${num}" title="Home office los ${letra === 'L' ? 'lunes' : letra === 'M' ? 'martes' : letra === 'X' ? 'miercoles' : letra === 'J' ? 'jueves' : 'viernes'}">${letra}</button>`
+  ).join('') + `</div>`;
+}
+
 function adminView(){
   const isAdmin = state.user.role === 'admin';
   const tabs = `
@@ -577,9 +628,10 @@ function adminView(){
         <td><span class="badge rol">${c.role === 'admin' ? 'RH' : c.role === 'visualizador' ? 'Visualizador' : c.role === 'supervisor' ? 'Consulta de asistencia' : 'Colaborador'}</span></td>
         <td>${new Date(c.registeredAt).toLocaleDateString('es-MX')}</td>
         <td class="ip">${esc(c.ip)}</td>
-      </tr>`).join('') : `<tr><td colspan="5" class="empty">Aun no hay colaboradores registrados.</td></tr>`;
-    content = `<table>
-      <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Fecha registro</th><th>IP de registro</th></tr></thead>
+        <td>${diasHomeOfficeCell(c, isAdmin)}</td>
+      </tr>`).join('') : `<tr><td colspan="6" class="empty">Aun no hay colaboradores registrados.</td></tr>`;
+    content = rosterFaltantesBanner() + `<table>
+      <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Fecha registro</th><th>IP de registro</th><th>Home office (L-M-X-J-V)</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>`;
   } else if(state.adminTab === 'reportes'){
@@ -688,6 +740,24 @@ function attachHandlers(){
     await loadReportesAsistencia(fechaEl ? fechaEl.value : null);
     render();
   };
+  document.querySelectorAll('.dia-btn').forEach(btn => {
+    btn.onclick = async () => {
+      const wrap = btn.closest('.dias-toggle');
+      const email = wrap.dataset.email;
+      btn.classList.toggle('activo');
+      const dias = [...wrap.querySelectorAll('.dia-btn.activo')].map(b => Number(b.dataset.dia));
+      try{
+        await api('/solicitudes/colaboradores/' + encodeURIComponent(email) + '/home-office', {
+          method: 'PATCH',
+          body: JSON.stringify({ dias })
+        });
+      }catch(e){
+        alert('No se pudo guardar el cambio: ' + e.message);
+      }
+      await loadDataForRole();
+      render();
+    };
+  });
   document.querySelectorAll('[data-approve]').forEach(b => {
     b.onclick = () => resolverSolicitud(b.dataset.approve, 'aprobada');
   });

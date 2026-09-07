@@ -24,26 +24,37 @@ function horaMexico24(epochMs) {
   });
 }
 
-// --- Asistencia de hoy: quien llego tarde, quien salio temprano, quien no marco ---
-async function getResumenAsistenciaHoy() {
-  const hoy = hoyISO();
+// --- Asistencia de un dia dado (por default hoy): quien llego tarde,
+// quien salio temprano/tardio, quien no marco, y su ubicacion ---
+async function getResumenAsistenciaHoy(fechaParam) {
+  const dia = fechaParam || hoyISO();
   const asistencias = await pool.query(
-    `SELECT email, asistencia_movimiento, created_at
+    `SELECT email, asistencia_movimiento, created_at, asistencia_lat, asistencia_lng
      FROM solicitudes
      WHERE tipo = 'Asistencia'
        AND to_char(to_timestamp(created_at / 1000.0) AT TIME ZONE '${ZONA}', 'YYYY-MM-DD') = $1`,
-    [hoy]
+    [dia]
   );
 
   const porEmail = {};
   for (const row of asistencias.rows) {
     const email = row.email;
     const hora = horaMexico24(Number(row.created_at));
-    if (!porEmail[email]) porEmail[email] = { entrada: null, salida: null };
+    if (!porEmail[email]) {
+      porEmail[email] = { entrada: null, salida: null, entradaLat: null, entradaLng: null, salidaLat: null, salidaLng: null };
+    }
     if (row.asistencia_movimiento === 'entrada') {
-      if (!porEmail[email].entrada || hora < porEmail[email].entrada) porEmail[email].entrada = hora;
+      if (!porEmail[email].entrada || hora < porEmail[email].entrada) {
+        porEmail[email].entrada = hora;
+        porEmail[email].entradaLat = row.asistencia_lat;
+        porEmail[email].entradaLng = row.asistencia_lng;
+      }
     } else if (row.asistencia_movimiento === 'salida') {
-      if (!porEmail[email].salida || hora > porEmail[email].salida) porEmail[email].salida = hora;
+      if (!porEmail[email].salida || hora > porEmail[email].salida) {
+        porEmail[email].salida = hora;
+        porEmail[email].salidaLat = row.asistencia_lat;
+        porEmail[email].salidaLng = row.asistencia_lng;
+      }
     }
   }
 
@@ -52,12 +63,16 @@ async function getResumenAsistenciaHoy() {
   );
 
   return colaboradores.rows.map(c => {
-    const datos = porEmail[c.email] || { entrada: null, salida: null };
+    const datos = porEmail[c.email] || { entrada: null, salida: null, entradaLat: null, entradaLng: null, salidaLat: null, salidaLng: null };
     return {
       nombre: c.nombre,
       email: c.email,
       entrada: datos.entrada,
       salida: datos.salida,
+      entradaLat: datos.entradaLat,
+      entradaLng: datos.entradaLng,
+      salidaLat: datos.salidaLat,
+      salidaLng: datos.salidaLng,
       tarde: !!(datos.entrada && datos.entrada > HORA_ENTRADA_LIMITE),
       salidaTemprana: !!(datos.salida && datos.salida < HORA_SALIDA_LIMITE),
       salidaTardia: !!(datos.salida && datos.salida > HORA_SALIDA_LIMITE),
@@ -104,12 +119,16 @@ function csvEscape(s) {
 
 // ===================== Endpoints para ver en el portal =====================
 
-// GET /api/reportes/asistencia-hoy
+// GET /api/reportes/asistencia-hoy?fecha=YYYY-MM-DD (opcional, por default hoy)
 // El rol 'supervisor' SOLO tiene acceso a este endpoint de todo /api/reportes
 // y de todo /api/solicitudes -- es su unica ventana al sistema.
 router.get('/asistencia-hoy', requireAuth, requireRole('admin', 'visualizador', 'supervisor'), async (req, res) => {
-  const resumen = await getResumenAsistenciaHoy();
-  res.json({ resumen });
+  const fecha = req.query.fecha || hoyISO();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+    return res.status(400).json({ error: 'Fecha invalida.' });
+  }
+  const resumen = await getResumenAsistenciaHoy(fecha);
+  res.json({ resumen, fecha });
 });
 
 // GET /api/reportes/incidencias-mensual?mes=YYYY-MM

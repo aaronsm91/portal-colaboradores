@@ -169,6 +169,7 @@ const state = {
   reportesAsistencia: [],
   reportesIncidencias: [],
   reportesMes: null,
+  reportesAsistenciaFecha: null,
   regRolForzado: null
 };
 
@@ -234,10 +235,12 @@ async function loadDataForRole(){
   }
 }
 
-async function loadReportesAsistencia(){
+async function loadReportesAsistencia(fecha){
+  const f = fecha || state.reportesAsistenciaFecha;
   try{
-    const data = await api('/reportes/asistencia-hoy');
+    const data = await api('/reportes/asistencia-hoy' + (f ? '?fecha=' + encodeURIComponent(f) : ''));
     state.reportesAsistencia = data.resumen;
+    state.reportesAsistenciaFecha = data.fecha;
   }catch(e){ state.reportesAsistencia = []; }
 }
 
@@ -472,7 +475,15 @@ function defaultMes(){
   return `${d.getFullYear()}-${mm}`;
 }
 
+function defaultFecha(){
+  const d = new Date();
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
 function asistenciaHoyTable(){
+  const fechaActual = state.reportesAsistenciaFecha || defaultFecha();
   const asistRows = state.reportesAsistencia.length ? state.reportesAsistencia.map(r => {
     let estadoBadge;
     if(r.sinRegistro) estadoBadge = '<span class="badge rechazada">Sin registrar</span>';
@@ -482,18 +493,30 @@ function asistenciaHoyTable(){
     if(r.salidaTemprana) salidaBadge = ' <span class="badge pendiente">Salida temprana</span>';
     else if(r.salidaTardia) salidaBadge = ' <span class="badge rol">Salida tardia</span>';
     else if(r.sinSalida) salidaBadge = ' <span class="badge rechazada">Sin salida</span>';
+    const entradaMapa = (r.entradaLat != null && r.entradaLng != null)
+      ? ` <a href="https://www.google.com/maps?q=${r.entradaLat},${r.entradaLng}" target="_blank" rel="noopener" title="Ver ubicacion de entrada">📍</a>` : '';
+    const salidaMapa = (r.salidaLat != null && r.salidaLng != null)
+      ? ` <a href="https://www.google.com/maps?q=${r.salidaLat},${r.salidaLng}" target="_blank" rel="noopener" title="Ver ubicacion de salida">📍</a>` : '';
     return `<tr>
       <td>${esc(r.nombre)}</td>
-      <td>${r.entrada || '—'}</td>
-      <td>${r.salida || '—'}${salidaBadge}</td>
+      <td>${r.entrada || '—'}${entradaMapa}</td>
+      <td>${r.salida || '—'}${salidaMapa}${salidaBadge}</td>
       <td>${estadoBadge}</td>
     </tr>`;
-  }).join('') : `<tr><td colspan="4" class="empty">Aun no hay colaboradores con rol "Colaborador" registrados.</td></tr>`;
+  }).join('') : `<tr><td colspan="4" class="empty">Sin colaboradores o sin registros para ese dia.</td></tr>`;
 
   return `
-    <h3 style="font-family:'Source Serif 4',serif;color:var(--navy);margin:0 0 4px;font-size:16px;">Asistencia de hoy</h3>
-    <p class="hint" style="margin:0 0 12px;">Tarde = entrada despues de las 10:00 am. Salida temprana = antes de las 6:00 pm. Salida tardia = despues de las 6:00 pm.</p>
-    <button class="btn small ghost" id="refreshAsistencia" style="margin-bottom:10px;">Actualizar</button>
+    <h3 style="font-family:'Source Serif 4',serif;color:var(--navy);margin:0 0 4px;font-size:16px;">Asistencia</h3>
+    <p class="hint" style="margin:0 0 12px;">Tarde = entrada despues de las 10:00 am. Salida temprana = antes de las 6:00 pm. Salida tardia = despues de las 6:00 pm. El icono 📍 abre la ubicacion en Google Maps.</p>
+    <div class="row2" style="align-items:end;max-width:340px;margin-bottom:10px;">
+      <div>
+        <label for="asistenciaFecha">Fecha</label>
+        <input id="asistenciaFecha" type="date" value="${fechaActual}" max="${defaultFecha()}">
+      </div>
+      <div>
+        <button class="btn small ghost" id="refreshAsistencia">Actualizar</button>
+      </div>
+    </div>
     <table>
       <thead><tr><th>Colaborador</th><th>Entrada</th><th>Salida</th><th>Estado</th></tr></thead>
       <tbody>${asistRows}</tbody>
@@ -504,7 +527,7 @@ function supervisorView(){
   return `
   <div class="card">
     <h2>Panel de asistencia</h2>
-    <p class="sub">Consulta de solo lectura: entradas y salidas de hoy.</p>
+    <p class="sub">Consulta de solo lectura: entradas, salidas y ubicacion por dia.</p>
     ${asistenciaHoyTable()}
   </div>`;
 }
@@ -654,9 +677,15 @@ function attachHandlers(){
     await loadReportesIncidencias(state.reportesMes);
     render();
   };
+  const asistenciaFechaEl = document.getElementById('asistenciaFecha');
+  if(asistenciaFechaEl) asistenciaFechaEl.onchange = async () => {
+    await loadReportesAsistencia(asistenciaFechaEl.value);
+    render();
+  };
   const refreshAsistenciaBtn = document.getElementById('refreshAsistencia');
   if(refreshAsistenciaBtn) refreshAsistenciaBtn.onclick = async () => {
-    await loadReportesAsistencia();
+    const fechaEl = document.getElementById('asistenciaFecha');
+    await loadReportesAsistencia(fechaEl ? fechaEl.value : null);
     render();
   };
   document.querySelectorAll('[data-approve]').forEach(b => {

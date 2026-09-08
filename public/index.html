@@ -238,6 +238,7 @@ async function loadDataForRole(){
   if(!state.user) return;
   if(state.user.role === 'supervisor'){
     await loadReportesAsistencia();
+    await loadRosterFaltantes();
     return;
   }
   try{
@@ -555,6 +556,7 @@ function supervisorView(){
   <div class="card">
     <h2>Panel de asistencia</h2>
     <p class="sub">Consulta de solo lectura: entradas, salidas y ubicacion por dia.</p>
+    ${rosterFaltantesBanner()}
     ${asistenciaHoyTable()}
   </div>`;
 }

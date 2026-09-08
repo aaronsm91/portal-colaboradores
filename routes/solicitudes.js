@@ -163,7 +163,7 @@ router.patch('/colaboradores/:email/home-office', requireAuth, requireRole('admi
 // registrado como colaborador, y devuelve quienes de esa lista todavia
 // no tienen cuenta. Se calcula en vivo en cada llamada, para que nunca
 // quede desactualizado conforme la gente se va registrando.
-router.get('/roster-faltantes', requireAuth, requireRole('admin', 'visualizador'), async (req, res) => {
+router.get('/roster-faltantes', requireAuth, requireRole('admin', 'visualizador', 'supervisor'), async (req, res) => {
   const roster = await pool.query(
     'SELECT nombre_completo, departamento FROM roster_esperado ORDER BY departamento, nombre_completo'
   );

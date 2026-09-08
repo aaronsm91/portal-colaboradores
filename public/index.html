@@ -629,7 +629,7 @@ function adminView(){
         <td>${esc(c.nombre)}</td>
         <td>${esc(c.email)}</td>
         <td><span class="badge rol">${c.role === 'admin' ? 'RH' : c.role === 'visualizador' ? 'Visualizador' : c.role === 'supervisor' ? 'Consulta de asistencia' : 'Colaborador'}</span></td>
-        <td>${new Date(c.registeredAt).toLocaleDateString('es-MX')}</td>
+        <td>${new Date(Number(c.registeredAt)).toLocaleDateString('es-MX')}</td>
         <td class="ip">${esc(c.ip)}</td>
         <td>${diasHomeOfficeCell(c, isAdmin)}</td>
       </tr>`).join('') : `<tr><td colspan="6" class="empty">Aun no hay colaboradores registrados.</td></tr>`;
